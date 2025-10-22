@@ -5,7 +5,11 @@ const AuthContext = createContext();
 
 // Hook personnalisé pour utiliser le contexte d'authentification
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth doit être utilisé à l\'intérieur d\'un AuthProvider');
+  }
+  return context;
 };
 
 /**
@@ -22,86 +26,177 @@ export const AuthProvider = ({ children }) => {
 
   // Données utilisateur simulées (pour la démonstration sans backend)
   const simulatedUsers = {
-    'admin@example.com': { password: 'password', role: 'admin', id: 'admin-123' },
-    'user@example.com': { password: 'password', role: 'user', id: 'user-456' },
+    'admin@example.com': { 
+      password: 'password', 
+      role: 'admin', 
+      id: 'admin-123',
+      email: 'admin@example.com'
+    },
+    'user@example.com': { 
+      password: 'password', 
+      role: 'user', 
+      id: 'user-456',
+      email: 'user@example.com'
+    },
   };
 
   useEffect(() => {
     // Simuler la vérification de l'état d'authentification au chargement
     const checkAuthStatus = () => {
-      // Récupérer l'utilisateur depuis le stockage local (simulé)
-      const storedUser = localStorage.getItem('currentUser');
-      const storedRole = localStorage.getItem('userRole');
-      const storedUserId = localStorage.getItem('userId');
+      try {
+        // Récupérer l'utilisateur depuis le stockage local
+        const storedUser = localStorage.getItem('currentUser');
+        const storedRole = localStorage.getItem('userRole');
+        const storedUserId = localStorage.getItem('userId');
 
-      if (storedUser && storedRole && storedUserId) {
-        setCurrentUser(JSON.parse(storedUser));
-        setUserRole(storedRole);
-        setUserId(storedUserId);
+        if (storedUser && storedRole && storedUserId) {
+          const parsedUser = JSON.parse(storedUser);
+          
+          // Vérifier si l'utilisateur existe toujours dans nos données simulées
+          if (simulatedUsers[parsedUser.email]) {
+            setCurrentUser(parsedUser);
+            setUserRole(storedRole);
+            setUserId(storedUserId);
+          } else {
+            // Si l'utilisateur n'existe plus, nettoyer le stockage
+            clearAuthStorage();
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification de l\'authentification:', error);
+        clearAuthStorage();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     checkAuthStatus();
   }, []);
 
+  // Fonction pour nettoyer le stockage d'authentification
+  const clearAuthStorage = () => {
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
+    setCurrentUser(null);
+    setUserRole('guest');
+    setUserId(null);
+  };
+
+  // Validation des entrées
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    return password && password.length >= 6;
+  };
+
   // Fonction d'inscription simulée
   const register = async (email, password, role = 'user') => {
     return new Promise((resolve, reject) => {
-      setTimeout(() => { // Simuler un délai réseau
+      setTimeout(() => {
+        // Validation des entrées
+        if (!validateEmail(email)) {
+          reject({ code: 'auth/invalid-email', message: 'Format d\'e-mail invalide.' });
+          return;
+        }
+
+        if (!validatePassword(password)) {
+          reject({ code: 'auth/weak-password', message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+          return;
+        }
+
         if (simulatedUsers[email]) {
           reject({ code: 'auth/email-already-in-use', message: 'Cet e-mail est déjà utilisé.' });
         } else {
-          const newUserId = `simulated-user-${Date.now()}`;
-          const newUser = { email, password, role, id: newUserId };
-          simulatedUsers[email] = newUser; // Ajouter l'utilisateur à la liste simulée
+          const newUserId = `user-${Date.now()}`;
+          const newUser = { 
+            email, 
+            password, 
+            role, 
+            id: newUserId 
+          };
           
-          // Simuler la connexion après l'inscription
-          localStorage.setItem('currentUser', JSON.stringify({ email, uid: newUserId }));
+          // Ajouter l'utilisateur à la liste simulée
+          simulatedUsers[email] = newUser;
+          
+          // Sauvegarder dans le localStorage
+          const userData = { email, uid: newUserId };
+          localStorage.setItem('currentUser', JSON.stringify(userData));
           localStorage.setItem('userRole', role);
           localStorage.setItem('userId', newUserId);
-          setCurrentUser({ email, uid: newUserId });
+          
+          // Mettre à jour l'état
+          setCurrentUser(userData);
           setUserRole(role);
           setUserId(newUserId);
-          resolve({ user: { email, uid: newUserId } });
+          
+          resolve({ user: userData });
         }
-      }, 500); // Délai de 500ms
+      }, 500);
     });
   };
 
   // Fonction de connexion simulée
   const login = async (email, password) => {
     return new Promise((resolve, reject) => {
-      setTimeout(() => { // Simuler un délai réseau
+      setTimeout(() => {
+        // Validation des entrées
+        if (!validateEmail(email)) {
+          reject({ code: 'auth/invalid-email', message: 'Format d\'e-mail invalide.' });
+          return;
+        }
+
+        if (!validatePassword(password)) {
+          reject({ code: 'auth/invalid-credential', message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+          return;
+        }
+
         const user = simulatedUsers[email];
         if (user && user.password === password) {
-          localStorage.setItem('currentUser', JSON.stringify({ email, uid: user.id }));
+          const userData = { email, uid: user.id };
+          
+          // Sauvegarder dans le localStorage
+          localStorage.setItem('currentUser', JSON.stringify(userData));
           localStorage.setItem('userRole', user.role);
           localStorage.setItem('userId', user.id);
-          setCurrentUser({ email, uid: user.id });
+          
+          // Mettre à jour l'état
+          setCurrentUser(userData);
           setUserRole(user.role);
           setUserId(user.id);
-          resolve({ user: { email, uid: user.id } });
+          
+          resolve({ user: userData });
         } else {
-          reject({ code: 'auth/invalid-credential', message: 'E-mail ou mot de passe invalide.' });
+          reject({ 
+            code: 'auth/invalid-credential', 
+            message: 'E-mail ou mot de passe invalide.' 
+          });
         }
-      }, 500); // Délai de 500ms
+      }, 500);
     });
   };
 
   // Fonction de déconnexion simulée
   const logout = async () => {
     return new Promise((resolve) => {
-      setTimeout(() => { // Simuler un délai réseau
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userId');
-        setCurrentUser(null);
-        setUserRole('guest');
-        setUserId(null);
+      setTimeout(() => {
+        clearAuthStorage();
         resolve();
-      }, 300); // Délai de 300ms
+      }, 300);
     });
+  };
+
+  // Fonction pour vérifier si l'utilisateur est authentifié
+  const isAuthenticated = () => {
+    return currentUser !== null && userId !== null;
+  };
+
+  // Fonction pour vérifier les rôles
+  const hasRole = (requiredRole) => {
+    return userRole === requiredRole;
   };
 
   const value = {
@@ -112,7 +207,8 @@ export const AuthProvider = ({ children }) => {
     register,
     login,
     logout,
-    
+    isAuthenticated,
+    hasRole
   };
 
   return (

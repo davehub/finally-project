@@ -9,7 +9,7 @@ const equipmentSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['laptop', 'desktop', 'server', 'network', 'printer', 'mobile', 'peripheral', 'other'],
+      enum: [],
       required: true,
     },
     model: {
