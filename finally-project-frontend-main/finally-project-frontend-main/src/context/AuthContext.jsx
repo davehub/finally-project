@@ -25,20 +25,22 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Données utilisateur simulées (pour la démonstration sans backend)
-  const simulatedUsers = {
+  const [simulatedUsers, setSimulatedUsers] = useState({
     'admin@example.com': { 
       password: 'password', 
       role: 'admin', 
       id: 'admin-123',
-      email: 'admin@example.com'
+      email: 'admin@example.com',
+      name: 'Administrateur Demo'
     },
     'user@example.com': { 
       password: 'password', 
       role: 'user', 
       id: 'user-456',
-      email: 'user@example.com'
+      email: 'user@example.com',
+      name: 'Utilisateur Demo'
     },
-  };
+  });
 
   useEffect(() => {
     // Simuler la vérification de l'état d'authentification au chargement
@@ -53,7 +55,13 @@ export const AuthProvider = ({ children }) => {
           const parsedUser = JSON.parse(storedUser);
           
           // Vérifier si l'utilisateur existe toujours dans nos données simulées
-          if (simulatedUsers[parsedUser.email]) {
+          // Note: On ne peut pas accéder à simulatedUsers dans le useEffect directement
+          // On fait une vérification basique pour cette démo
+          const isValidUser = Object.values(simulatedUsers).some(
+            user => user.id === storedUserId && user.email === parsedUser.email
+          );
+          
+          if (isValidUser) {
             setCurrentUser(parsedUser);
             setUserRole(storedRole);
             setUserId(storedUserId);
@@ -93,8 +101,8 @@ export const AuthProvider = ({ children }) => {
     return password && password.length >= 6;
   };
 
-  // Fonction d'inscription simulée
-  const register = async (email, password, role = 'user') => {
+  // Fonction d'inscription simulée - CORRIGÉ: minuscule pour correspondre aux composants
+  const register = async (email, password, role = 'user', name = '') => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         // Validation des entrées
@@ -116,14 +124,20 @@ export const AuthProvider = ({ children }) => {
             email, 
             password, 
             role, 
-            id: newUserId 
+            id: newUserId,
+            name: name || `Utilisateur ${role}`
           };
           
           // Ajouter l'utilisateur à la liste simulée
-          simulatedUsers[email] = newUser;
+          const updatedUsers = { ...simulatedUsers, [email]: newUser };
+          setSimulatedUsers(updatedUsers);
           
           // Sauvegarder dans le localStorage
-          const userData = { email, uid: newUserId };
+          const userData = { 
+            email, 
+            uid: newUserId,
+            name: newUser.name
+          };
           localStorage.setItem('currentUser', JSON.stringify(userData));
           localStorage.setItem('userRole', role);
           localStorage.setItem('userId', newUserId);
@@ -139,7 +153,7 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // Fonction de connexion simulée
+  // Fonction de connexion simulée - CORRIGÉ: minuscule pour correspondre aux composants
   const login = async (email, password) => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -156,7 +170,11 @@ export const AuthProvider = ({ children }) => {
 
         const user = simulatedUsers[email];
         if (user && user.password === password) {
-          const userData = { email, uid: user.id };
+          const userData = { 
+            email, 
+            uid: user.id,
+            name: user.name
+          };
           
           // Sauvegarder dans le localStorage
           localStorage.setItem('currentUser', JSON.stringify(userData));
@@ -199,23 +217,32 @@ export const AuthProvider = ({ children }) => {
     return userRole === requiredRole;
   };
 
+  // Fonction pour vérifier plusieurs rôles
+  const hasAnyRole = (requiredRoles) => {
+    return requiredRoles.includes(userRole);
+  };
+
   const value = {
     currentUser,
     userRole,
     userId,
     loading,
-    register,
-    login,
+    register, // CORRIGÉ: minuscule
+    login,    // CORRIGÉ: minuscule
     logout,
     isAuthenticated,
-    hasRole
+    hasRole,
+    hasAnyRole
   };
 
   return (
     <AuthContext.Provider value={value}>
       {loading ? (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
-          <div className="text-lg font-semibold text-gray-700">Chargement de l'authentification...</div>
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div className="text-lg font-semibold text-gray-700">Chargement de l'authentification...</div>
+          </div>
         </div>
       ) : (
         children

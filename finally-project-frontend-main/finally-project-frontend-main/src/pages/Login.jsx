@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import InputField from "../components/common/InputField";
 import Button from "../components/common/Button";
@@ -12,6 +12,18 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Récupérer le message de succès et l'email depuis l'inscription
+  const successMessage = location.state?.message;
+  const prefilledEmail = location.state?.email;
+
+  // Pré-remplir l'email si disponible après inscription
+  React.useEffect(() => {
+    if (prefilledEmail) {
+      setEmail(prefilledEmail);
+    }
+  }, [prefilledEmail]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +50,9 @@ const Login = () => {
 
     try {
       await login(email, password);
-      navigate("/"); // Rediriger vers le tableau de bord après la connexion
+      // Rediriger vers la page d'origine ou le tableau de bord
+      const from = location.state?.from?.pathname || "/";
+      navigate(from, { replace: true });
     } catch (err) {
       console.error("Erreur de connexion:", err.code, err.message);
       
@@ -55,6 +69,9 @@ const Login = () => {
           break;
         case "auth/too-many-requests":
           setError("Trop de tentatives de connexion. Veuillez réessayer plus tard.");
+          break;
+        case "auth/network-request-failed":
+          setError("Erreur de réseau. Veuillez vérifier votre connexion.");
           break;
         default:
           setError(err.message || "Échec de la connexion. Veuillez réessayer.");
@@ -80,8 +97,16 @@ const Login = () => {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-200 to-gray-100 p-6">
       <Card title="Connexion" className="w-full max-w-md shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Message de succès après inscription */}
+          {successMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative mb-4">
+              <span className="block sm:inline">{successMessage}</span>
+            </div>
+          )}
+          
+          {/* Message d'erreur */}
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 animate-pulse">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4">
               <span className="block sm:inline">{error}</span>
             </div>
           )}
@@ -116,7 +141,14 @@ const Login = () => {
             className="w-full mt-4"
             variant="primary"
           >
-            {loading ? "Connexion en cours..." : "Se connecter"}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Connexion en cours...
+              </div>
+            ) : (
+              "Se connecter"
+            )}
           </Button>
         </form>
 
@@ -154,6 +186,16 @@ const Login = () => {
             className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
           >
             Inscrivez-vous ici
+          </Link>
+        </p>
+
+        {/* Lien mot de passe oublié (optionnel) */}
+        <p className="mt-3 text-center text-sm text-gray-600">
+          <Link
+            to="/forgot-password"
+            className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+          >
+            Mot de passe oublié ?
           </Link>
         </p>
       </Card>

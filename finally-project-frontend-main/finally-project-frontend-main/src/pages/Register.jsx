@@ -7,10 +7,13 @@ import Card from "../components/common/Card";
 import SelectField from "../components/common/SelectField";
 
 const Register = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("user");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: "user"
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -21,28 +24,41 @@ const Register = () => {
     { value: "admin", label: "Administrateur" },
   ];
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     
     // Validation côté client
-    if (!email || !password || !confirmPassword) {
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError("Veuillez remplir tous les champs.");
       return;
     }
 
+    if (formData.name.length < 2) {
+      setError("Le nom doit contenir au moins 2 caractères.");
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(formData.email)) {
       setError("Format d'e-mail invalide.");
       return;
     }
 
-    if (password.length < 6) {
+    if (formData.password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setError("Les mots de passe ne correspondent pas.");
       return;
     }
@@ -50,12 +66,12 @@ const Register = () => {
     setLoading(true);
 
     try {
-      await register(email, password, role);
+      await register(formData.email, formData.password, formData.role, formData.name);
       // Redirection vers la page de connexion après inscription réussie
       navigate("/login", { 
         state: { 
           message: "Inscription réussie ! Veuillez vous connecter.",
-          email: email 
+          email: formData.email 
         }
       });
     } catch (err) {
@@ -86,10 +102,13 @@ const Register = () => {
       ? `admin-demo-${Date.now()}@example.com` 
       : `user-demo-${Date.now()}@example.com`;
     
-    setEmail(demoEmail);
-    setPassword('password');
-    setConfirmPassword('password');
-    setRole(userType);
+    setFormData({
+      name: userType === 'admin' ? "Administrateur Demo" : "Utilisateur Demo",
+      email: demoEmail,
+      password: 'password',
+      confirmPassword: 'password',
+      role: userType
+    });
     setError('');
   };
 
@@ -98,17 +117,31 @@ const Register = () => {
       <Card title="Inscription" className="w-full max-w-md shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 animate-pulse">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4">
               <span className="block sm:inline">{error}</span>
             </div>
           )}
           
           <InputField
+            id="name"
+            name="name"
+            label="Nom complet"
+            type="text"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="Votre nom complet"
+            required
+            className="shadow-sm"
+            autoComplete="name"
+          />
+          
+          <InputField
             id="email"
+            name="email"
             label="E-mail"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={formData.email}
+            onChange={handleChange}
             placeholder="votre.email@example.com"
             required
             className="shadow-sm"
@@ -117,10 +150,11 @@ const Register = () => {
           
           <InputField
             id="password"
+            name="password"
             label="Mot de passe"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={formData.password}
+            onChange={handleChange}
             placeholder="********"
             required
             className="shadow-sm"
@@ -129,10 +163,11 @@ const Register = () => {
           
           <InputField
             id="confirmPassword"
+            name="confirmPassword"
             label="Confirmer le mot de passe"
             type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            value={formData.confirmPassword}
+            onChange={handleChange}
             placeholder="********"
             required
             className="shadow-sm"
@@ -141,9 +176,10 @@ const Register = () => {
           
           <SelectField
             id="role"
+            name="role"
             label="Rôle"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
+            value={formData.role}
+            onChange={handleChange}
             options={availableRoles}
             required
             className="shadow-sm"
@@ -155,7 +191,14 @@ const Register = () => {
             className="w-full mt-4"
             variant="primary"
           >
-            {loading ? "Inscription en cours..." : "S'inscrire"}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Inscription en cours...
+              </div>
+            ) : (
+              "S'inscrire"
+            )}
           </Button>
         </form>
 
